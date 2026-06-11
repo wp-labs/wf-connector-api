@@ -18,29 +18,48 @@
 //! | Source model | `SourceEvent { payload: RawData }` | `(stream, RecordBatch)` |
 //! | Consumer | parse pipeline (WPL) | CEP engine (warp-fusion) |
 //! | Sink model | `SinkFactory` (bytes/data records) | TBD (`BatchSink`) |
+//! | Error model | `SourceResult<T>` (own error) | `SourceResult<T>` (orion-error) |
 //!
 //! `wp-connectors` (the implementation crate) can implement BOTH traits
 //! for the same connector (Kafka / File / TCP), sharing connection logic.
 
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
+use orion_error::{OrionError, StructError, UnifiedReason};
+
+// -- Error -------------------------------------------------------------------
+
+/// Connector error reason — all variants carry detail via `with_detail()`.
+#[derive(Debug, Clone, PartialEq, OrionError)]
+pub enum SourceReason {
+    /// I/O error from the underlying transport.
+    #[orion_error(message = "I/O error", identity = "sys.wf_connector.io")]
+    Io,
+    /// Failed to establish connection / bind.
+    #[orion_error(message = "connection error", identity = "sys.wf_connector.connect")]
+    Connect,
+    /// Message / frame decoding failed.
+    #[orion_error(message = "decode error", identity = "sys.wf_connector.decode")]
+    Decode,
+    /// Referenced connector not found in registry.
+    #[orion_error(message = "connector not found", identity = "sys.wf_connector.not_found")]
+    NotFound,
+    /// Catch-all for unexpected errors.
+    #[orion_error(transparent)]
+    General(UnifiedReason),
+}
+
+impl SourceReason {
+    pub fn fail<T>(&self, detail: impl Into<String>) -> SourceResult<T> {
+        let err = SourceError::from(self.clone()).with_detail(detail.into());
+        Err(err)
+    }
+}
+
+pub type SourceError = StructError<SourceReason>;
+pub type SourceResult<T> = Result<T, SourceError>;
 
 // -- Source ------------------------------------------------------------------
-
-/// Unified error type for connector operations.
-#[derive(Debug, thiserror::Error)]
-pub enum ConnectorError {
-    #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("connect error: {0}")]
-    Connect(String),
-    #[error("decode error: {0}")]
-    Decode(String),
-    #[error("not found: {0}")]
-    NotFound(String),
-    #[error("{0}")]
-    Other(String),
-}
 
 /// A batch-oriented data source that produces Arrow RecordBatches.
 ///
@@ -49,7 +68,7 @@ pub enum ConnectorError {
 #[async_trait]
 pub trait BatchSource: Send {
     /// Attempt to receive zero or more batches.
-    async fn receive_batch(&mut self) -> Result<Vec<(String, RecordBatch)>, ConnectorError>;
+    async fn receive_batch(&mut self) -> SourceResult<Vec<(String, RecordBatch)>>;
 
     /// Human-readable source identifier for logging / metrics.
     fn source_name(&self) -> &str;
@@ -63,7 +82,7 @@ pub trait BatchSource: Send {
 // #[async_trait]
 // pub trait BatchSink: Send {
 //     async fn send_batch(&mut self, stream: &str, batch: &RecordBatch)
-//         -> Result<(), ConnectorError>;
-//     async fn flush(&mut self) -> Result<(), ConnectorError>;
+//         -> SourceResult<()>;
+//     async fn flush(&mut self) -> SourceResult<()>;
 // }
 // ```
