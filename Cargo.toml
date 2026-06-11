@@ -1,8 +1,14 @@
 [package]
 name = "wf-connector-api"
-version = "0.1.0"
+version = "0.1.0" #@gxl:set(version)
 edition = "2021"
 license = "Apache-2.0"
+description = "Minimal Arrow-native connector API for warp-fusion — BatchSource trait with RecordBatch support"
+repository = "https://github.com/wp-labs/wf-connector-api"
+documentation = "https://docs.rs/wf-connector-api"
+readme = "README.md"
+keywords = ["arrow", "connector", "batch", "source", "streaming"]
+categories = ["data-structures", "asynchronous"]
 
 [dependencies]
 arrow = "54"
