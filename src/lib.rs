@@ -53,7 +53,10 @@ pub enum SourceReason {
     #[orion_error(message = "decode error", identity = "sys.wf_connector.decode")]
     Decode,
     /// Referenced connector not found in registry.
-    #[orion_error(message = "connector not found", identity = "sys.wf_connector.not_found")]
+    #[orion_error(
+        message = "connector not found",
+        identity = "sys.wf_connector.not_found"
+    )]
     NotFound,
     /// Catch-all for unexpected errors.
     #[orion_error(transparent)]
