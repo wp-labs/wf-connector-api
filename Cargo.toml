@@ -11,6 +11,6 @@ keywords = ["arrow", "connector", "batch", "source", "streaming"]
 categories = ["data-structures", "asynchronous"]
 
 [dependencies]
-arrow = "54"
+arrow = "59"
 async-trait = "0.1"
 orion-error = { version = "0.8", features = ["derive"] }
