@@ -15,27 +15,38 @@
 //!
 //! | | wp-connector-api | wf-connector-api |
 //! |---|---|---|
-//! | Source model | `SourceEvent { payload: RawData }` | `(stream, RecordBatch)` |
+//! | Source data | `SourceEvent { payload: RawData }` | `RecordBatch` (columnar) |
 //! | Consumer | parse pipeline (WPL) | CEP engine (warp-fusion) |
-//! | Sink model | `SinkFactory` (bytes/data records) | TBD (`BatchSink`) |
-//! | Error model | `SourceResult<T>` (own error) | `SourceResult<T>` (orion-error) |
+//! | Error model | `SourceResult<T>` (orion-error) | `SourceResult<T>` (orion-error) |
+//! | Lifecycle | `start()` / `receive()` / `close()` | `start()` / `receive_batch()` / `close()` |
 //!
 //! `wp-connectors` (the implementation crate) can implement BOTH traits
 //! for the same connector (Kafka / File / TCP), sharing connection logic.
 
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
+use orion_error::conversion::ToStructError;
 use orion_error::{OrionError, StructError, UnifiedReason};
+use std::error::Error as StdError;
 
 // -- Error -------------------------------------------------------------------
 
-/// Connector error reason — all variants carry detail via `with_detail()`.
+/// Connector error reason.
+///
+/// All leaf variants carry detail via `err_detail()`. `SourceError` wraps
+/// each variant with a detail string and optional source error.
 #[derive(Debug, Clone, PartialEq, OrionError)]
 pub enum SourceReason {
+    /// End of stream — no more data will be produced.
+    #[orion_error(message = "end of stream", identity = "sys.wf_connector.eof")]
+    EOF,
+    /// No data currently available (not EOF); caller should retry.
+    #[orion_error(message = "no data available", identity = "sys.wf_connector.not_data")]
+    NotData,
     /// I/O error from the underlying transport.
     #[orion_error(message = "I/O error", identity = "sys.wf_connector.io")]
     Io,
-    /// Failed to establish connection / bind.
+    /// Failed to establish connection / bind / subscribe.
     #[orion_error(message = "connection error", identity = "sys.wf_connector.connect")]
     Connect,
     /// Message / frame decoding failed.
@@ -50,9 +61,17 @@ pub enum SourceReason {
 }
 
 impl SourceReason {
-    pub fn fail<T>(&self, detail: impl Into<String>) -> SourceResult<T> {
-        let err = SourceError::from(self.clone()).with_detail(detail.into());
-        Err(err)
+    /// Create an error with detail message.
+    pub fn err_detail<S: Into<String>>(self, detail: S) -> SourceError {
+        self.to_err().with_detail(detail.into())
+    }
+
+    /// Create an error with a source (chained) error.
+    pub fn err_source<E>(self, source: E) -> SourceError
+    where
+        E: StdError + Send + Sync + 'static,
+    {
+        self.to_err().with_source(source)
     }
 }
 
@@ -61,17 +80,45 @@ pub type SourceResult<T> = Result<T, SourceError>;
 
 // -- Source ------------------------------------------------------------------
 
-/// A batch-oriented data source that produces Arrow RecordBatches.
+/// A batch-oriented data source that produces Arrow [`RecordBatch`]es.
 ///
-/// Each call returns zero or more `(stream_name, RecordBatch)` pairs.
-/// An empty `Vec` means "no data available right now" (not EOF).
+/// # Lifecycle
+///
+/// 1. `start()` — initialize (connect, subscribe, bind)
+/// 2. `receive_batch()` — pull data in a loop
+/// 3. `close()` — release resources (unsubscribe, close connections)
+///
+/// `close()` must be idempotent — safe to call multiple times, even before `start()`.
+///
+/// # Empty vs EOF
+///
+/// - Return `Ok(vec![])` when no data is currently available (caller should retry).
+/// - Return `Err(SourceReason::EOF.into())` when the stream has ended.
 #[async_trait]
 pub trait BatchSource: Send {
-    /// Attempt to receive zero or more batches.
-    async fn receive_batch(&mut self) -> SourceResult<Vec<(String, RecordBatch)>>;
+    /// Initialize the source. Called once before the first `receive_batch()`.
+    ///
+    /// Default is a no-op.
+    async fn start(&mut self) -> SourceResult<()> {
+        Ok(())
+    }
 
-    /// Human-readable source identifier for logging / metrics.
-    fn source_name(&self) -> &str;
+    /// Receive zero or more [`RecordBatch`]es.
+    ///
+    /// An empty `Vec` means "no data right now" — the caller should poll again.
+    /// An error with `SourceReason::EOF` means the stream has ended.
+    async fn receive_batch(&mut self) -> SourceResult<Vec<RecordBatch>>;
+
+    /// Close the source and release all resources.
+    ///
+    /// Must be idempotent — safe to call multiple times or before `start()`.
+    /// Default is a no-op.
+    async fn close(&mut self) -> SourceResult<()> {
+        Ok(())
+    }
+
+    /// Unique identifier for this source instance (logging / metrics).
+    fn identifier(&self) -> &str;
 }
 
 // -- Sink (TBD) --------------------------------------------------------------
@@ -81,8 +128,10 @@ pub trait BatchSource: Send {
 // ```ignore
 // #[async_trait]
 // pub trait BatchSink: Send {
-//     async fn send_batch(&mut self, stream: &str, batch: &RecordBatch)
-//         -> SourceResult<()>;
+//     async fn start(&mut self) -> SourceResult<()> { Ok(()) }
+//     async fn send_batch(&mut self, batch: &RecordBatch) -> SourceResult<()>;
 //     async fn flush(&mut self) -> SourceResult<()>;
+//     async fn close(&mut self) -> SourceResult<()> { Ok(()) }
+//     fn identifier(&self) -> &str;
 // }
 // ```
