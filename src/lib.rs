@@ -124,17 +124,35 @@ pub trait BatchSource: Send {
     fn identifier(&self) -> &str;
 }
 
-// -- Sink (TBD) --------------------------------------------------------------
+// -- Sink --------------------------------------------------------------------
 
-// Future extension:
-//
-// ```ignore
-// #[async_trait]
-// pub trait BatchSink: Send {
-//     async fn start(&mut self) -> SourceResult<()> { Ok(()) }
-//     async fn send_batch(&mut self, batch: &RecordBatch) -> SourceResult<()>;
-//     async fn flush(&mut self) -> SourceResult<()>;
-//     async fn close(&mut self) -> SourceResult<()> { Ok(()) }
-//     fn identifier(&self) -> &str;
-// }
-// ```
+/// A batch-oriented data sink that consumes Arrow [`RecordBatch`]es.
+///
+/// # Lifecycle
+///
+/// 1. `start()` — initialize (connect, open file, etc.)
+/// 2. `send_batch()` — push data in a loop
+/// 3. `flush()` — ensure all data is written
+/// 4. `close()` — release resources
+///
+/// `close()` must be idempotent — safe to call multiple times, even before `start()`.
+#[async_trait]
+pub trait BatchSink: Send {
+    /// Initialize the sink. Called once before the first `send_batch()`.
+    async fn start(&mut self) -> SourceResult<()> { Ok(()) }
+
+    /// Send a batch of records for the given stream.
+    ///
+    /// Multiple streams may be sent to the same sink (e.g., a file sink
+    /// writing to different files per stream).
+    async fn send_batch(&mut self, stream: &str, batch: &RecordBatch) -> SourceResult<()>;
+
+    /// Flush any buffered data. Called periodically or before close.
+    async fn flush(&mut self) -> SourceResult<()> { Ok(()) }
+
+    /// Close the sink and release all resources. Must be idempotent.
+    async fn close(&mut self) -> SourceResult<()> { Ok(()) }
+
+    /// Unique identifier for this sink instance (logging / metrics).
+    fn identifier(&self) -> &str;
+}
