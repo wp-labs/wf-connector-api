@@ -8,8 +8,9 @@
 //! designed for downstream parse pipelines. CEP engines like warp-fusion
 //! operate on Arrow `RecordBatch` directly.
 //!
-//! `wf-connector-api` fills this gap — one trait for sources, extensible
-//! to sinks in the future (e.g. `BatchSink` for Arrow-native output).
+//! `wf-connector-api` fills this gap for Arrow-native source consumption.
+//! (Sink output uses the existing `wp-connector-api` `SinkRuntime` —
+//! adding `send_batch()` to it is sufficient, no new trait needed.)
 //!
 //! ## Relationship with `wp-connector-api`
 //!
@@ -124,35 +125,9 @@ pub trait BatchSource: Send {
     fn identifier(&self) -> &str;
 }
 
-// -- Sink --------------------------------------------------------------------
-
-/// A batch-oriented data sink that consumes Arrow [`RecordBatch`]es.
-///
-/// # Lifecycle
-///
-/// 1. `start()` — initialize (connect, open file, etc.)
-/// 2. `send_batch()` — push data in a loop
-/// 3. `flush()` — ensure all data is written
-/// 4. `close()` — release resources
-///
-/// `close()` must be idempotent — safe to call multiple times, even before `start()`.
-#[async_trait]
-pub trait BatchSink: Send {
-    /// Initialize the sink. Called once before the first `send_batch()`.
-    async fn start(&mut self) -> SourceResult<()> { Ok(()) }
-
-    /// Send a batch of records for the given stream.
-    ///
-    /// Multiple streams may be sent to the same sink (e.g., a file sink
-    /// writing to different files per stream).
-    async fn send_batch(&mut self, stream: &str, batch: &RecordBatch) -> SourceResult<()>;
-
-    /// Flush any buffered data. Called periodically or before close.
-    async fn flush(&mut self) -> SourceResult<()> { Ok(()) }
-
-    /// Close the sink and release all resources. Must be idempotent.
-    async fn close(&mut self) -> SourceResult<()> { Ok(()) }
-
-    /// Unique identifier for this sink instance (logging / metrics).
-    fn identifier(&self) -> &str;
-}
+// -- Sink (not needed as a separate trait) -----------------------------------
+//
+// Arrow-native sink output is handled by the existing `wp-connector-api`
+// `SinkRuntime`. Adding a `send_batch()` method to `SinkRuntime` (which
+// already has `send_record()`) is sufficient — no new trait required.
+// File / Arrow IPC / TCP backends can natively accept RecordBatch.
