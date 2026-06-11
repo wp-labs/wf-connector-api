@@ -1,0 +1,57 @@
+!Job
+name: flow
+tasks:
+- name: config
+  begin: 2026-06-11 13:47:09
+  stdout: ''
+  result: !Ok
+    running_time: ''
+  actions: []
+- name: config
+  begin: 2026-06-11 13:47:09
+  stdout: ''
+  result: !Ok
+    running_time: ''
+  actions: []
+- name: config
+  begin: 2026-06-11 13:47:09
+  stdout: ''
+  result: !Ok
+    running_time: ''
+  actions: []
+- name: config
+  begin: 2026-06-11 13:47:09
+  stdout: ''
+  result: !Ok
+    running_time: ''
+  actions: []
+- name: config
+  begin: 2026-06-11 13:47:09
+  stdout: ''
+  result: !Ok
+    running_time: ''
+  actions: []
+- name: you-proj@build
+  begin: 2026-06-11 13:47:15
+  stdout: ''
+  result: !Ok
+    running_time: ''
+  actions: []
+- name: config
+  begin: 2026-06-11 13:47:15
+  stdout: ''
+  result: !Ok
+    running_time: ''
+  actions: []
+- name: config
+  begin: 2026-06-11 13:47:15
+  stdout: ''
+  result: !Ok
+    running_time: ''
+  actions: []
+- name: pub to local
+  begin: 2026-06-11 13:47:15
+  stdout: ''
+  result: !Ok
+    running_time: ''
+  actions: []
