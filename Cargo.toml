@@ -1,6 +1,6 @@
 [package]
 name = "wf-connector-api"
-version = "0.2.0" #@gxl:set(version)
+version = "0.1.1" #@gxl:set(version)
 edition = "2021"
 license = "Apache-2.0"
 description = "Minimal Arrow-native connector API for warp-fusion — BatchSource trait with RecordBatch support"
@@ -11,6 +11,6 @@ keywords = ["arrow", "connector", "batch", "source", "streaming"]
 categories = ["data-structures", "asynchronous"]
 
 [dependencies]
-#arrow = "59"
+arrow = "59"
 async-trait = "0.1"
 orion-error = { version = "0.8", features = ["derive"] }
