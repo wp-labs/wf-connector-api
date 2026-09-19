@@ -1,5 +1,12 @@
 # wf-connector-api
 
+[![Crates.io](https://img.shields.io/crates/v/wf-connector-api.svg)](https://crates.io/crates/wf-connector-api)
+[![CI](https://img.shields.io/github/actions/workflow/status/wp-labs/wf-connector-api/ci.yml?branch=main)](https://github.com/wp-labs/wf-connector-api/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/wp-labs/wf-connector-api/graph/badge.svg?token=6SVCXBHB6B)](https://codecov.io/gh/wp-labs/wf-connector-api)
+[![Crates.io downloads](https://img.shields.io/crates/d/wf-connector-api)](https://crates.io/crates/wf-connector-api)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
+[![Rust Edition](https://img.shields.io/badge/edition-2021-orange.svg)](https://doc.rust-lang.org/edition-guide/rust-2021/index.html)
+
 Minimal Arrow-native connector API for [warp-fusion](https://github.com/wp-labs/warp-fusion).
 
 ## Overview
